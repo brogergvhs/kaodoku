@@ -73,6 +73,19 @@ struct KaodokuApp: App {
       } message: {
         Text(app.store.persistenceError ?? "")
       }
+      .alert("Reading progress isn't syncing",
+             isPresented: Binding(
+               get: { app.store.syncError != nil },
+               set: {
+                 if !$0 {
+                   app.store.clearSyncError()
+                 }
+               }
+             )) {
+        Button("OK", role: .cancel) {}
+      } message: {
+        Text(app.store.syncError ?? "")
+      }
     }
   }
 }

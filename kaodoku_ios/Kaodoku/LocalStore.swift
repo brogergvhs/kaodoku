@@ -108,6 +108,12 @@ final class LocalStore {
   private(set) var activeDownload: Int64?
   private(set) var downloadProgress: Double = 0
   private(set) var persistenceError: String?
+  private(set) var syncError: String?
+
+  var pendingMarks: Int {
+    queue.count
+  }
+
   private var corruptIndex = false
   private var corruptQueue = false
   private var queue: [QueuedMark] = []
@@ -369,6 +375,10 @@ final class LocalStore {
     }
   }
 
+  func clearSyncError() {
+    syncError = nil
+  }
+
   func clearPersistenceError() {
     persistenceError = nil
   }
@@ -595,14 +605,37 @@ final class LocalStore {
     flushing = true
     defer { flushing = false }
     struct Batch: Encodable { var entries: [QueuedMark] }
-    let sent = queue
+    struct Receipt: Decodable {
+      var applied: Int
+      var skipped: [String: Int]?
+    }
     await saved?.value
-    if await (try? api.data("POST", "/api/v1/reader/progress/batch", body: Batch(entries: sent))) != nil {
-      let sent = Set(sent)
-      queue.removeAll { sent.contains($0) }
-      if let instance {
-        persist(queue, to: Self.queueURL(instance))
+    while !queue.isEmpty {
+      let sent = Array(queue.prefix(200))
+      do {
+        let data = try await api.data("POST", "/api/v1/reader/progress/batch",
+                                      body: Batch(entries: sent))
+        let receipt = try? JSONDecoder().decode(Receipt.self, from: data)
+        let applied = receipt?.applied ?? sent.count
+        if applied < sent.count {
+          let why = (receipt?.skipped ?? [:])
+            .sorted { $0.value > $1.value }
+            .map { "\($0.key): \($0.value)" }
+            .joined(separator: ", ")
+          syncError = "The server accepted \(applied) of \(sent.count) reading marks. "
+            + "Refused — \(why). \(queue.count) still queued."
+        } else {
+          syncError = nil
+        }
+        let batch = Set(sent)
+        queue.removeAll { batch.contains($0) }
+      } catch {
+        syncError = "Reading progress couldn't be synced. \(error.localizedDescription)"
+        break
       }
+    }
+    if let instance {
+      persist(queue, to: Self.queueURL(instance))
     }
   }
 

@@ -404,10 +404,12 @@ struct ReaderView: View {
     app.setReaderMode("strip", forTitle: titleID)
   }
 
-  /// onSettle tracks the strip reader's top page for the UI and resume index.
   private func onSettle(_ i: Int) {
     guard pages.indices.contains(i) else { return }
     index = i
+    if !pages[i].transition {
+      mark(pages[i])
+    }
     extendIfNeeded()
   }
 

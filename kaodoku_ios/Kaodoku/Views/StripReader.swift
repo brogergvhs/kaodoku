@@ -120,6 +120,8 @@ struct StripReader: UIViewRepresentable {
       didResume = true
       reported = i
       finished = i - 1
+      let onPage = parent.onPage
+      DispatchQueue.main.async { onPage(i) }
     }
 
     func reportPage() {
