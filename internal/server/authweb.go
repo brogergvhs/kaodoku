@@ -354,7 +354,7 @@ func secureRequest(r *http.Request) bool {
 
 const loginPage = `<!doctype html><html lang="en" data-theme="mocha"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in · Kaodoku</title><link rel="stylesheet" href="/static/app.css">
+<title>Sign in · Kaodoku</title><link rel="icon" href="/static/favicon.ico" sizes="any"><link rel="stylesheet" href="/static/app.css">
 <body class="grid min-h-screen place-items-center bg-base-200">
 <form class="card bg-base-100 card-body w-80 gap-3" method="post" action="/login">
 <h1 class="text-xl font-bold">Kao<span class="text-primary">doku</span></h1>

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/nord-icons/icon-rounded.png" alt="Kaodoku" width="150" />
+  <img src="assets/icon-rounded.png" alt="Kaodoku" width="150" />
   <h1>Kaodoku</h1>
 </div>
 

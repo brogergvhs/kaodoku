@@ -22,3 +22,22 @@ func flushFailureIsVisible() async throws {
   #expect(store.syncError != nil)
   #expect(store.pendingMarks == 2) // kept for the next attempt, never dropped
 }
+
+@MainActor
+@Test("A device that has never downloaded can still save reading progress")
+func freshDevicePersistsProgress() async {
+  let files = FileManager.default
+  let instance = "fresh-\(UUID().uuidString)"
+  let dir = LocalStore.root.appendingPathComponent(instance, isDirectory: true)
+  defer { try? files.removeItem(at: dir) }
+  #expect(!files.fileExists(atPath: dir.path)) // nothing was ever downloaded
+
+  let store = LocalStore()
+  await store.load(instance: instance)
+  store.recordMark(id: 1, volume: false, page: 1, totalPages: 3)
+  await store.flush(nil) // save locally, no server involved
+
+  #expect(store.persistenceError == nil)
+  #expect(files.fileExists(atPath: LocalStore.queueURL(instance).path))
+  #expect(files.fileExists(atPath: LocalStore.indexURL(instance).path))
+}

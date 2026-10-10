@@ -680,6 +680,8 @@ final class LocalStore {
     persistenceTask = Task.detached(priority: .utility) { [weak self] in
       await previous?.value
       do {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
         try JSONEncoder().encode(value).write(to: url, options: .atomic)
       } catch {
         await self?.reportPersistenceError(error.localizedDescription)

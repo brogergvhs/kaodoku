@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/nord-icons/icon-rounded.png" alt="Kaodoku for iOS" width="120" />
+  <img src="../assets/icon-rounded.png" alt="Kaodoku for iOS" width="120" />
   <h1>Kaodoku for iOS</h1>
 </div>
 
