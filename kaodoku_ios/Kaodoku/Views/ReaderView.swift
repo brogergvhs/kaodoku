@@ -43,7 +43,6 @@ struct ReaderView: View {
   @State private var scrollID: Int?
   @State private var loadFailed = false
   @State private var extendChapter: Int64?
-  @State private var zoom: CGFloat = 1
   @State private var stripJump: StripReader.Jump?
   @State private var commandID = 0
   @State private var showChapters = false
@@ -160,26 +159,30 @@ struct ReaderView: View {
           ProgressView().tint(.white)
         } else if paged {
           let us = units
-          ScrollView(.horizontal, showsIndicators: false) {
-            LazyHStack(spacing: 0) {
-              ForEach(us.indices, id: \.self) { u in
-                ReaderPage(unit: us[u], maxPixelSize: pixels,
-                           active: abs(u - (scrollID ?? 0)) <= 1,
-                           zoom: $zoom,
-                           onImage: u == 0 ? { autoDetect(aspect: $0) } : nil)
-                  .containerRelativeFrame([.horizontal, .vertical])
+          ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+              LazyHStack(spacing: 0) {
+                ForEach(us.indices, id: \.self) { u in
+                  ReaderPage(unit: us[u], maxPixelSize: pixels,
+                             active: abs(u - (scrollID ?? 0)) <= 1,
+                             onImage: u == 0 ? { autoDetect(aspect: $0) } : nil)
+                    .containerRelativeFrame([.horizontal, .vertical])
+                }
+              }
+              .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $scrollID)
+            .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
+            .ignoresSafeArea()
+            .onChange(of: scrollID) {
+              if let u = scrollID, us.indices.contains(u) {
+                onSettleUnit(us[u])
               }
             }
-            .scrollTargetLayout()
-          }
-          .scrollTargetBehavior(.paging)
-          .scrollPosition(id: $scrollID)
-          .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
-          .ignoresSafeArea()
-          .onChange(of: scrollID) {
-            if let u = scrollID, us.indices.contains(u) {
-              onSettleUnit(us[u])
-            }
+            .onChange(of: geo.size.width) { repin(proxy) }
+            .onChange(of: doubleActive) { repin(proxy) }
+            .onChange(of: splitWide) { repin(proxy) }
           }
         } else {
           StripReader(
@@ -210,16 +213,6 @@ struct ReaderView: View {
       }
       .onChange(of: geo.size.width > geo.size.height, initial: true) { _, v in
         isLandscape = v
-      }
-      .onChange(of: doubleActive) {
-        if paged {
-          scrollID = unitIndex(forPage: index)
-        }
-      }
-      .onChange(of: splitWide) {
-        if paged {
-          scrollID = unitIndex(forPage: index)
-        }
       }
       .onChange(of: paged) {
         stripJump = nil
@@ -325,6 +318,14 @@ struct ReaderView: View {
     case (width * 2 / 3)...: step(by: -leftStep)
     default: showBar.toggle()
     }
+  }
+
+  /// repin forces the pager back onto the current page after rotation or a
+  /// unit reshape.
+  private func repin(_ proxy: ScrollViewProxy) {
+    let target = unitIndex(forPage: index)
+    scrollID = target
+    Task { @MainActor in proxy.scrollTo(target, anchor: .center) }
   }
 
   private func step(by delta: Int) {
@@ -672,9 +673,10 @@ struct ReaderPage: View {
   let unit: [ReaderView.DisplayPage]
   let maxPixelSize: CGSize
   var active = true
-  @Binding var zoom: CGFloat
   var onImage: ((CGFloat) -> Void)?
+  @State private var zoom: CGFloat = 1
   @State private var images: [Int: UIImage] = [:]
+  @State private var loadedWidth: CGFloat = 0
   @State private var failed = false
 
   private var transition: Bool {
@@ -685,6 +687,7 @@ struct ReaderPage: View {
     let active: Bool
     let unit: [ReaderView.DisplayPage]
     let enhanced: Bool
+    let width: Int
   }
 
   private var enhanced: Bool {
@@ -695,18 +698,21 @@ struct ReaderPage: View {
     content
       .onChange(of: active) { _, a in
         if !a {
-          images = [:]; failed = false
+          images = [:]; failed = false; zoom = 1
         }
       }
       .onChange(of: unit) {
         images = [:]
         failed = false
+        zoom = 1
       }
       .onChange(of: enhanced) {
         images = [:]
         failed = false
       }
-      .task(id: LoadKey(active: active, unit: unit, enhanced: enhanced)) { await loadIfNeeded() }
+      .task(id: LoadKey(active: active, unit: unit, enhanced: enhanced,
+                        width: Int(maxPixelSize.width)))
+      { await loadIfNeeded() }
   }
 
   @ViewBuilder private var content: some View {
@@ -743,8 +749,10 @@ struct ReaderPage: View {
   }
 
   private func loadIfNeeded() async {
-    guard active, !transition, images.count < unit.count else { return }
-    for (i, dp) in unit.enumerated() where images[i] == nil {
+    guard active, !transition else { return }
+    let reload = !images.isEmpty && loadedWidth != maxPixelSize.width
+    guard reload || images.count < unit.count else { return }
+    for (i, dp) in unit.enumerated() where reload || images[i] == nil {
       guard let img = await load(dp) else {
         if !Task.isCancelled {
           failed = true
@@ -757,6 +765,7 @@ struct ReaderPage: View {
         onImage?(img.size.width / max(img.size.height, 1))
       }
     }
+    loadedWidth = maxPixelSize.width
   }
 
   private func load(_ dp: ReaderView.DisplayPage) async -> UIImage? {
