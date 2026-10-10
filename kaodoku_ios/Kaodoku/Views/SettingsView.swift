@@ -81,6 +81,7 @@ struct SettingsView: View {
       .nordScreen()
       .navigationTitle("Settings")
       .navigationBarTitleDisplayMode(.inline)
+      .connectionStatusToolbar()
       .task {
         guard let api = app.api else { return }
         anilist = try? await api.get("/api/v1/anilist")
@@ -111,6 +112,7 @@ struct SettingsView: View {
 
   private var serverSection: some View {
     Section("Servers") {
+      NavigationLink("Sync status") { SyncStatusView() }
       SavedServersList(editing: $editingServer)
       Button("Add a server", systemImage: "plus") { editingServer = SavedServer(name: "") }
     }

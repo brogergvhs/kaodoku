@@ -62,6 +62,7 @@ final class ZoomPageUIView: UIView, UIScrollViewDelegate {
         $0.image.size.width / max($0.image.size.height, 1) * $0.contentsRect.width
       }
       scroll.zoomScale = 1
+      content.frame = .zero
       layoutContent()
     } else if params != appliedParams {
       appliedParams = params

@@ -108,10 +108,21 @@ final class LocalStore {
   private(set) var activeDownload: Int64?
   private(set) var downloadProgress: Double = 0
   private(set) var persistenceError: String?
+  private(set) var syncError: String?
+  private(set) var flushing = false
+  private(set) var lastSyncAt: Date?
+
+  var pendingMarks: Int {
+    queue.count
+  }
+
+  var queuedMarks: [QueuedMark] {
+    queue
+  }
+
   private var corruptIndex = false
   private var corruptQueue = false
   private var queue: [QueuedMark] = []
-  private var flushing = false
   private var progressDirty = false
   private var progressSaveTask: Task<Void, Never>?
   private var persistenceTask: Task<Void, Never>?
@@ -369,6 +380,10 @@ final class LocalStore {
     }
   }
 
+  func clearSyncError() {
+    syncError = nil
+  }
+
   func clearPersistenceError() {
     persistenceError = nil
   }
@@ -486,8 +501,12 @@ final class LocalStore {
               data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary
             ),
             let props = CGImageSourceCopyPropertiesAtIndex(image, 0, nil) as? [CFString: Any],
-            let w = props[kCGImagePropertyPixelWidth] as? Double,
-            let h = props[kCGImagePropertyPixelHeight] as? Double, w > 0, h > 0 else { return 0 }
+            var w = props[kCGImagePropertyPixelWidth] as? Double,
+            var h = props[kCGImagePropertyPixelHeight] as? Double, w > 0, h > 0 else { return 0 }
+      let orientation = (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+      if orientation >= 5, orientation <= 8 {
+        swap(&w, &h)
+      }
       return w / h
     }
   }
@@ -591,14 +610,38 @@ final class LocalStore {
     flushing = true
     defer { flushing = false }
     struct Batch: Encodable { var entries: [QueuedMark] }
-    let sent = queue
+    struct Receipt: Decodable {
+      var applied: Int
+      var skipped: [String: Int]?
+    }
     await saved?.value
-    if await (try? api.data("POST", "/api/v1/reader/progress/batch", body: Batch(entries: sent))) != nil {
-      let sent = Set(sent)
-      queue.removeAll { sent.contains($0) }
-      if let instance {
-        persist(queue, to: Self.queueURL(instance))
+    while !queue.isEmpty {
+      let sent = Array(queue.prefix(200))
+      do {
+        let data = try await api.data("POST", "/api/v1/reader/progress/batch",
+                                      body: Batch(entries: sent))
+        let receipt = try? JSONDecoder().decode(Receipt.self, from: data)
+        let applied = receipt?.applied ?? sent.count
+        if applied < sent.count {
+          let why = (receipt?.skipped ?? [:])
+            .sorted { $0.value > $1.value }
+            .map { "\($0.key): \($0.value)" }
+            .joined(separator: ", ")
+          syncError = "The server accepted \(applied) of \(sent.count) reading marks. "
+            + "Refused — \(why). \(queue.count) still queued."
+        } else {
+          syncError = nil
+        }
+        lastSyncAt = Date()
+        let batch = Set(sent)
+        queue.removeAll { batch.contains($0) }
+      } catch {
+        syncError = "Reading progress couldn't be synced. \(error.localizedDescription)"
+        break
       }
+    }
+    if let instance {
+      persist(queue, to: Self.queueURL(instance))
     }
   }
 
@@ -643,6 +686,8 @@ final class LocalStore {
     persistenceTask = Task.detached(priority: .utility) { [weak self] in
       await previous?.value
       do {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
         try JSONEncoder().encode(value).write(to: url, options: .atomic)
       } catch {
         await self?.reportPersistenceError(error.localizedDescription)

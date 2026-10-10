@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="../assets/nord-icons/icon-rounded.png" alt="Kaodoku for iOS" width="120" />
+  <img src="../assets/icon-rounded.png" alt="Kaodoku for iOS" width="120" />
   <h1>Kaodoku for iOS</h1>
 </div>
 
@@ -24,6 +24,9 @@ offline.
 - Paged (LTR/RTL, single/double) and long-strip reader modes.
 - Eye-comfort controls: warmth, dimming, and white-only tinting.
 - Offline downloads — read device CBZs with no connection; progress syncs back.
+- Live sync status: a status dot in the top bar shows online/offline at a
+  glance and opens a sync screen with the address in use (local or remote),
+  queued progress, and failures.
 - Multi-server: save several servers, auto-routing between local and public URLs.
 
 ## Installing

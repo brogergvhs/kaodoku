@@ -47,7 +47,7 @@ struct KaodokuApp: App {
       .preferredColorScheme(.dark)
       .onChange(of: scenePhase) { _, phase in
         if phase != .active {
-          Task { await app.store.flush(nil) }
+          Task { await app.store.flush(app.online ? app.api : nil) }
         } else {
           app.scheduleReselect()
         }

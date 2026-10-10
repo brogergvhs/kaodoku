@@ -38,6 +38,7 @@ struct DownloadsView: View {
         .nordScreen()
         .navigationTitle("Downloads")
         .navigationBarTitleDisplayMode(.inline)
+        .connectionStatusToolbar()
         .navigationDestination(for: Int64.self) { LocalTitleView(titleId: $0) }
     }
   }
@@ -82,6 +83,7 @@ struct OfflineView: View {
       }
       .nordScreen()
       .navigationBarTitleDisplayMode(.inline)
+      .connectionStatusToolbar()
       .navigationDestination(for: Int64.self) { LocalTitleView(titleId: $0) }
       .navigationDestination(for: OfflineServer.self) { server in
         DownloadsGrid()

@@ -134,31 +134,56 @@ func (a *apiV1) progressBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applied := 0
+	skipped := map[string]int{}
 	for _, e := range body.Entries {
 		readAt := ""
 		if e.ReadAt != "" {
 			t, err := time.Parse(time.RFC3339, e.ReadAt)
-			if err != nil || t.After(time.Now().Add(5*time.Minute)) || t.Year() < 2000 {
+			if err != nil || t.Year() < 2000 {
+				skipped["bad_time"]++
 				continue
+			}
+			if now := time.Now(); t.After(now) {
+				t = now
 			}
 			readAt = database.FormatTime(t)
 		}
 		switch {
 		case e.ChapterID > 0:
-			if status, err := a.svc.ChapterReadStatus(r.Context(), e.ChapterID); err != nil || !titleAllowed(r.Context(), a.svc, status.TitleID) {
+			status, err := a.svc.ChapterReadStatus(r.Context(), e.ChapterID)
+			if err != nil {
+				skipped["unknown_chapter"]++
 				continue
 			}
-			if _, err := a.svc.MarkPageReadAt(r.Context(), e.ChapterID, e.Page, e.TotalPages, readAt); err == nil {
-				applied++
+			if !titleAllowed(r.Context(), a.svc, status.TitleID) {
+				skipped["blocked_title"]++
+				continue
 			}
+			if _, err := a.svc.MarkPageReadAt(r.Context(), e.ChapterID, e.Page, e.TotalPages, readAt); err != nil {
+				skipped["write_failed"]++
+				continue
+			}
+			applied++
 		case e.VolumeID > 0:
-			if vol, err := a.svc.GetVolume(r.Context(), e.VolumeID); err != nil || !titleAllowed(r.Context(), a.svc, vol.TitleID) {
+			vol, err := a.svc.GetVolume(r.Context(), e.VolumeID)
+			if err != nil {
+				skipped["unknown_volume"]++
 				continue
 			}
-			if _, err := a.svc.MarkVolumePageRead(r.Context(), e.VolumeID, e.Page, e.TotalPages); err == nil {
-				applied++
+			if !titleAllowed(r.Context(), a.svc, vol.TitleID) {
+				skipped["blocked_title"]++
+				continue
 			}
+			if _, err := a.svc.MarkVolumePageRead(r.Context(), e.VolumeID, e.Page, e.TotalPages); err != nil {
+				skipped["write_failed"]++
+				continue
+			}
+			applied++
+		default:
+			skipped["no_id"]++
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]int{"applied": applied})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"applied": applied, "received": len(body.Entries), "skipped": skipped,
+	})
 }

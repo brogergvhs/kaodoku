@@ -366,7 +366,7 @@ struct TitleDetailView: View {
 
   private func load() async {
     guard let api = app.api else { return }
-    await app.store.flush(api)
+    await app.store.flush(app.online ? api : nil)
     let mode = volumes ? "?mode=volumes" : ""
     progress = try? await api.get("/api/v1/reader/titles/\(titleID)\(mode)")
     activity = try? await api.get("/api/v1/library/\(titleID)/activity")

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/brogergvhs/kaodoku/internal/auth"
 	chaptersPkg "github.com/brogergvhs/kaodoku/internal/chapters"
@@ -209,11 +210,42 @@ func TestAPIV1ReaderAndLibrary(t *testing.T) {
 		},
 	})
 	var batch struct {
-		Applied int `json:"applied"`
+		Applied  int            `json:"applied"`
+		Received int            `json:"received"`
+		Skipped  map[string]int `json:"skipped"`
 	}
 	_ = json.NewDecoder(rec.Body).Decode(&batch)
 	if rec.Code != http.StatusOK || batch.Applied != 1 {
 		t.Fatalf("batch = %d applied=%d", rec.Code, batch.Applied)
+	}
+	// A partial batch has to say why, or a client cannot tell a silent
+	// no-op from a success and drops marks the server never stored.
+	if batch.Received != 2 || batch.Skipped["unknown_chapter"] != 1 {
+		t.Fatalf("batch receipt = %+v", batch)
+	}
+	rec = do(t, api, http.MethodPost, "/api/v1/reader/progress/batch", "", map[string]any{
+		"entries": []map[string]any{
+			{"page": 1, "total_pages": 3},
+			{"chapter_id": chapter.ID, "page": 0, "total_pages": 3},
+		},
+	})
+	batch.Skipped = nil
+	_ = json.NewDecoder(rec.Body).Decode(&batch)
+	if batch.Skipped["no_id"] != 1 || batch.Skipped["write_failed"] != 1 {
+		t.Fatalf("skip reasons = %+v", batch.Skipped)
+	}
+
+	// A device clock ahead of the server's is clamped, not dropped.
+	ahead := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	rec = do(t, api, http.MethodPost, "/api/v1/reader/progress/batch", "", map[string]any{
+		"entries": []map[string]any{
+			{"chapter_id": chapter.ID, "page": 2, "total_pages": 3, "read_at": ahead},
+		},
+	})
+	batch.Applied = 0
+	_ = json.NewDecoder(rec.Body).Decode(&batch)
+	if rec.Code != http.StatusOK || batch.Applied != 1 {
+		t.Fatalf("future batch = %d applied=%d", rec.Code, batch.Applied)
 	}
 
 	var delta struct {
