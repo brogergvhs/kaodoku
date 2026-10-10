@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/brogergvhs/kaodoku/internal/catalog"
+	"github.com/brogergvhs/kaodoku/internal/chapters"
 	"github.com/brogergvhs/kaodoku/internal/jobs"
 	"github.com/brogergvhs/kaodoku/internal/library"
 	"github.com/brogergvhs/kaodoku/internal/service"
@@ -76,6 +77,8 @@ type chapterProgressDTO struct {
 	TitleID         int64      `json:"title_id"`
 	Label           string     `json:"label"`
 	Title           string     `json:"title"`
+	DisplayName     string     `json:"display_name"`
+	DisplayVolume   string     `json:"display_volume,omitempty"`
 	NumberMain      int        `json:"number_main"`
 	Downloaded      bool       `json:"downloaded"`
 	Bytes           int64      `json:"bytes"`
@@ -91,8 +94,10 @@ type chapterProgressDTO struct {
 }
 
 func toChapterProgressDTO(c library.ChapterReadStatus) chapterProgressDTO {
+	d := chapters.DisplayName(c.Label, c.Title)
 	return chapterProgressDTO{
 		ID: c.ID, TitleID: c.TitleID, Label: c.Label, Title: c.Title, NumberMain: c.NumberMain,
+		DisplayName: d.Name, DisplayVolume: d.Volume,
 		Downloaded: c.Downloaded, Bytes: c.Bytes, Pages: c.Pages, TotalPages: c.TotalPages,
 		ReadPages: c.ReadPages, LastPage: c.LastPage, Completed: c.Completed, Manual: c.Manual,
 		FirstUnreadPage: c.FirstUnreadPage, LastReadAt: c.LastReadAt, CompletedAt: c.CompletedAt,

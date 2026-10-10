@@ -2191,9 +2191,7 @@ func (s *JobService) enqueueRefreshForTitle(ctx context.Context, title library.T
 	if !strings.HasPrefix(strings.TrimSpace(title.SourceURL), "http") {
 		return nil
 	}
-	// Linking always refreshes the chapter list
-	// first source of a title (nothing discovered yet) also kicks off the missing download
-	payload := JobPayload{TitleID: title.ID, DownloadAfterRefresh: title.DiscoveredCount == 0}
+	payload := JobPayload{TitleID: title.ID, DownloadAfterRefresh: true}
 	if _, err := s.enqueue(ctx, jobs.TypeRefreshTitle, payload, time.Now()); err != nil {
 		return fmt.Errorf("queue chapter refresh: %w", err)
 	}
@@ -2630,7 +2628,7 @@ func (s *JobService) enqueueDownloadAfterRefresh(ctx context.Context, titleID in
 	if err != nil {
 		return err
 	}
-	if !title.Monitored || title.MissingCount <= 1 {
+	if title.MissingCount == 0 {
 		return nil
 	}
 	if _, err := s.enqueueExact(ctx, jobs.TypeDownloadMissing, JobPayload{TitleID: title.ID}, time.Now()); err != nil {

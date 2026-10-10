@@ -113,6 +113,8 @@ struct ChapterProgress: Decodable, Identifiable, Hashable {
   var titleId: Int64
   var label: String
   var title: String
+  var displayName: String?
+  var displayVolume: String?
   var numberMain: Int
   var downloaded: Bool
   var bytes: Int64

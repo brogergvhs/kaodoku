@@ -83,10 +83,12 @@
 {{end}}
 
 {{define "chapterName"}}
-{{- $text := .Label}}{{if .Title}}{{$text = printf "%s: %s" .Label .Title}}{{end -}}
+{{- $d := chname .Label .Title}}
+{{- $text := printf "Chapter %s" .Label}}{{if $d.Name}}{{$text = printf "%s: %s" .Label $d.Name}}{{end -}}
 {{if .Downloaded}}<a class="link link-hover font-medium" href="/reader/{{.TitleID}}?chapter={{.ID}}">{{$text}}</a>
 {{- else if .Failed}}<span class="font-medium" title="{{.Error}}">{{$text}}</span>
 {{- else}}<span class="font-medium">{{$text}}</span>{{end}}
+{{- if $d.Volume}}<div class="text-xs text-base-content/50">{{$d.Volume}}</div>{{end}}
 {{end}}
 
 {{define "chapterActions"}}

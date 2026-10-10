@@ -26,6 +26,7 @@ import (
 
 	"github.com/brogergvhs/kaodoku/internal/auth"
 	"github.com/brogergvhs/kaodoku/internal/catalog"
+	"github.com/brogergvhs/kaodoku/internal/chapters"
 	"github.com/brogergvhs/kaodoku/internal/config"
 	"github.com/brogergvhs/kaodoku/internal/database"
 	"github.com/brogergvhs/kaodoku/internal/jobs"
@@ -3917,6 +3918,7 @@ func pathID(r *http.Request) (int64, error) {
 func (u *webUI) funcs() template.FuncMap {
 	return template.FuncMap{
 		"assetVer": func() string { return u.assetVer },
+		"chname":   chapters.DisplayName,
 		"jobLabel": jobLabel,
 		"tokenExpired": func(expiresAt string) bool {
 			t, err := database.ParseTime(expiresAt)
