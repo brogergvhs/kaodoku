@@ -16,7 +16,10 @@ struct ComfortParams: Equatable {
 
 /// ReaderComfort applies ComfortParams to a page image with Core Image.
 enum ReaderComfort {
-  private nonisolated(unsafe) static let context = CIContext(options: [.name: "readerComfort"])
+  private nonisolated(unsafe) static let context = CIContext(options: [
+    .name: "readerComfort",
+    .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
+  ])
 
   static func apply(_ image: UIImage, _ p: ComfortParams) -> UIImage {
     guard !p.isIdentity, let cg = image.cgImage else { return image }
