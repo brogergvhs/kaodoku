@@ -266,6 +266,7 @@ struct LibraryView: View {
       .nordScreen()
       .navigationTitle("Library")
       .navigationBarTitleDisplayMode(.inline)
+      .connectionStatusToolbar()
       .navigationDestination(for: Int64.self) { TitleDetailView(titleID: $0) }
       .navigationDestination(for: CollectionsRoute.self) { _ in CollectionsView() }
       .navigationDestination(for: CollectionEntry.self) { CollectionMembersView(entry: $0) }

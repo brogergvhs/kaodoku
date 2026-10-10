@@ -109,15 +109,20 @@ final class LocalStore {
   private(set) var downloadProgress: Double = 0
   private(set) var persistenceError: String?
   private(set) var syncError: String?
+  private(set) var flushing = false
+  private(set) var lastSyncAt: Date?
 
   var pendingMarks: Int {
     queue.count
   }
 
+  var queuedMarks: [QueuedMark] {
+    queue
+  }
+
   private var corruptIndex = false
   private var corruptQueue = false
   private var queue: [QueuedMark] = []
-  private var flushing = false
   private var progressDirty = false
   private var progressSaveTask: Task<Void, Never>?
   private var persistenceTask: Task<Void, Never>?
@@ -627,6 +632,7 @@ final class LocalStore {
         } else {
           syncError = nil
         }
+        lastSyncAt = Date()
         let batch = Set(sent)
         queue.removeAll { batch.contains($0) }
       } catch {

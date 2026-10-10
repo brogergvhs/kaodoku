@@ -21,6 +21,10 @@ func flushFailureIsVisible() async throws {
 
   #expect(store.syncError != nil)
   #expect(store.pendingMarks == 2) // kept for the next attempt, never dropped
+  #expect(store.lastSyncAt == nil) // nothing reached the server
+  #expect(store.queuedMarks.count == 2) // the sync screen sees what's waiting
+  #expect(store.queuedMarks.map(\.page) == [1, 2])
+  #expect(!store.flushing)
 }
 
 @MainActor

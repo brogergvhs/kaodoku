@@ -239,7 +239,7 @@ struct ReaderView: View {
     .onDisappear {
       Self.aspects.removeAll()
       Task {
-        await app.store.flush(app.api)
+        await app.store.flush(app.online ? app.api : nil)
         await LocalStore.clearPageCache()
       }
     }
@@ -524,6 +524,7 @@ struct ReaderView: View {
 
   private func mark(_ p: PageRef) {
     app.store.recordMark(id: p.chapterID, volume: volumes, page: p.page, totalPages: p.total)
+    app.scheduleFlush()
   }
 }
 

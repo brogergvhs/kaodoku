@@ -42,6 +42,7 @@ struct SearchView: View {
       .nordScreen()
       .navigationTitle(browsing ? "For you" : "Search")
       .navigationBarTitleDisplayMode(.inline)
+      .connectionStatusToolbar()
       .searchable(text: $query, prompt: "Search AniList")
       .toolbar {
         Button {

@@ -30,6 +30,19 @@ struct ServerEndpoints: Codable, Equatable {
     verifiable && mode != .external
   }
 
+  enum Slot { case local, external }
+
+  func slot(of url: URL) -> Slot? {
+    guard verifiable else { return nil }
+    if let l = localURL, sameOrigin(url, l) {
+      return .local
+    }
+    if let p = publicURL, sameOrigin(url, p) {
+      return .external
+    }
+    return nil
+  }
+
   func activeURL(localVerified: Bool) -> URL? {
     switch mode {
     case .external:
@@ -152,7 +165,16 @@ final class AppState {
   private var settingsDirty = false
   private var settingsTask: Task<Void, Never>?
   private var reselectTask: Task<Void, Never>?
+  private var flushTask: Task<Void, Never>?
   private let pathMonitor = NWPathMonitor()
+  private let pathQueue = DispatchQueue(label: "kaodoku.netpath")
+
+  private(set) var online = true
+
+  var activeSlot: ServerEndpoints.Slot? {
+    guard let api else { return nil }
+    return endpoints?.slot(of: api.baseURL)
+  }
 
   var connected: Bool {
     api != nil
@@ -173,9 +195,13 @@ final class AppState {
       settings = cached
     }
     pathMonitor.pathUpdateHandler = { [weak self] _ in
-      Task { @MainActor in self?.scheduleReselect() }
+      Task { @MainActor in
+        guard let self else { return }
+        self.online = self.pathMonitor.currentPath.status == .satisfied
+        self.scheduleReselect()
+      }
     }
-    pathMonitor.start(queue: .global(qos: .utility))
+    pathMonitor.start(queue: pathQueue)
     Task { [weak self] in await self?.reselect() }
   }
 
@@ -185,6 +211,20 @@ final class AppState {
       try? await Task.sleep(for: .seconds(1))
       guard !Task.isCancelled else { return }
       await reselect()
+      scheduleFlush()
+    }
+  }
+
+  /// scheduleFlush uploads queued reading progress shortly after a page is
+  /// read, so online devices stay in step with the server within seconds.
+  /// Marks recorded while the task sleeps ride along in the same batch.
+  func scheduleFlush() {
+    guard api != nil, online, flushTask == nil else { return }
+    flushTask = Task {
+      try? await Task.sleep(for: .seconds(1.5))
+      flushTask = nil
+      guard !Task.isCancelled, online, let api else { return }
+      await store.flush(api)
     }
   }
 
@@ -375,6 +415,8 @@ final class AppState {
     settingsDirty = false
     settingsTask?.cancel()
     reselectTask?.cancel()
+    flushTask?.cancel()
+    flushTask = nil
     if let api, api.token != nil {
       Task { _ = try? await api.data("DELETE", "/api/v1/auth/token") }
     }

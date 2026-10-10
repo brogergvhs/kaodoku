@@ -47,7 +47,7 @@ struct KaodokuApp: App {
       .preferredColorScheme(.dark)
       .onChange(of: scenePhase) { _, phase in
         if phase != .active {
-          Task { await app.store.flush(nil) }
+          Task { await app.store.flush(app.online ? app.api : nil) }
         } else {
           app.scheduleReselect()
         }
@@ -72,19 +72,6 @@ struct KaodokuApp: App {
         }
       } message: {
         Text(app.store.persistenceError ?? "")
-      }
-      .alert("Reading progress isn't syncing",
-             isPresented: Binding(
-               get: { app.store.syncError != nil },
-               set: {
-                 if !$0 {
-                   app.store.clearSyncError()
-                 }
-               }
-             )) {
-        Button("OK", role: .cancel) {}
-      } message: {
-        Text(app.store.syncError ?? "")
       }
     }
   }
